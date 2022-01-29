@@ -2,11 +2,10 @@
 #include <Arduino.h>
 #include <Smoothed.h>
 
-int32_t lastReading = 0;
-uint32_t offset = 0;
-float divider = 0;
 Adafruit_NAU7802 loadCell;
 static bool initialized = false;
+static uint32_t offset = 0;
+static float divider = 1;
 
 void calibrate() {
   int32_t newOffset = 0;
@@ -137,6 +136,10 @@ void loop() {
     }
   } else if (loadCell.available()) {
     int32_t raw = loadCell.read();
-    Serial.printf("Read value %d\n", raw);
+    Serial.printf("Raw value %d\n", raw);
+    float scaled = raw / divider;
+    Serial.printf("Scaled value %.2f\n", scaled);
+    float value = scaled + offset;
+    Serial.printf("Offset value %.2f\n", value);
   }
 }
