@@ -10,95 +10,66 @@ struct Settings {
 NAU7802 loadCell;
 static bool initialized = false;
 
-void calibrate() {
-  Serial.println(F("Send 't' to tare and continue."));
-
+void waitForCharacter(char c) {
   boolean _resume = false;
   while (_resume == false) {
     if (Serial.available() > 0) {
       char inByte = Serial.read();
-      if (inByte == 't') {
-        loadCell.calculateZeroOffset();
+      if (inByte == c) {
         _resume = true;
       }
     }
   }
+}
 
-  Serial.println(F("Place a dime on load cell and send 'c'."));
+void printCalibration() {
+  Serial.printf("(%d %.2f)\n(%d %.2f)\n(%d %.2f)\n\n", settings.readings[0],
+                settings.factors[0], settings.readings[1], settings.factors[1],
+                settings.readings[2], settings.factors[2]);
+}
 
-  _resume = false;
-  while (_resume == false) {
-    if (Serial.available() > 0) {
-      char inByte = Serial.read();
-      if (inByte == 'c') {
-        _resume = true;
-      }
-    }
+void calibrateSlot(uint8_t slot, float weight, uint8_t samples = 4) {
+  int32_t reading = 0;
+  float factor = 0;
+  for (uint8_t i = 0; i < samples; i++) {
+    int32_t avg = loadCell.getAverage(4);
+    reading += avg;
+    factor += (avg - loadCell.getZeroOffset()) / weight;
   }
+  reading /= (float)samples;
+  factor /= (float)samples;
+  settings.readings[slot] = reading;
+  settings.factors[slot] = factor;
 
-  float dimeCal = 0;
-  for (uint8_t i = 0; i < 5; i++) {
-    loadCell.calculateCalibrationFactor(2.268);
-    dimeCal += loadCell.getCalibrationFactor();
-  }
-  settings.readings[0] = loadCell.getAverage(8);
-  settings.factors[0] = dimeCal / 5.0;
+  Serial.printf("Reading %fg: %d\n", weight, reading);
+  Serial.printf("Factor %fg: %.4f\n", weight, factor);
+}
 
-  Serial.printf("Raw 2.268g: %d\n", settings.readings[0]);
-  Serial.printf("Cal 2.268g: %.4f\n", settings.factors[0]);
+void calibrate() {
+  Serial.println(F("Send 't' to tare and continue."));
+
+  waitForCharacter('t');
+  loadCell.calculateZeroOffset();
 
   Serial.println(F("Place a nickel on load cell and send 'c'."));
 
-  _resume = false;
-  while (_resume == false) {
-    if (Serial.available() > 0) {
-      char inByte = Serial.read();
-      if (inByte == 'c') {
-        _resume = true;
-      }
-    }
-  }
-
-  float nickelCal = 0;
-  for (uint8_t i = 0; i < 5; i++) {
-    loadCell.calculateCalibrationFactor(5.0);
-    nickelCal += loadCell.getCalibrationFactor();
-  }
-  settings.readings[1] = loadCell.getAverage(8);
-  settings.factors[1] = nickelCal / 5.0;
-
-  Serial.printf("Raw 5g: %d\n", settings.readings[1]);
-  Serial.printf("Cal 5g: %.4f\n", settings.factors[1]);
+  waitForCharacter('c');
+  calibrateSlot(0, 5);
 
   Serial.println(F("Place 10g on load cell and send 'c'."));
 
-  _resume = false;
-  while (_resume == false) {
-    if (Serial.available() > 0) {
-      char inByte = Serial.read();
-      if (inByte == 'c') {
-        _resume = true;
-      }
-    }
-  }
+  waitForCharacter('c');
+  calibrateSlot(1, 10.0);
 
-  float tenGramCal = 0;
-  for (uint8_t i = 0; i < 5; i++) {
-    loadCell.calculateCalibrationFactor(10.0);
-    tenGramCal += loadCell.getCalibrationFactor();
-  }
-  settings.readings[2] = loadCell.getAverage(8);
-  settings.factors[2] = tenGramCal / 5.0;
+  Serial.println(F("Place 200g on load cell and send 'c'."));
 
-  Serial.printf("Raw 10g: %d\n", settings.readings[2]);
-  Serial.printf("Cal 10g: %.4f\n", settings.factors[2]);
+  waitForCharacter('c');
+  calibrateSlot(2, 200.0);
+  printCalibration();
 
-  Serial.printf("(%d %.2f) (%d %.2f) (%d %.2f)", settings.readings[0],
-                settings.factors[0], settings.readings[1], settings.factors[1],
-                settings.readings[2], settings.factors[2]);
   Serial.print(F("Save these values? y/n"));
 
-  _resume = false;
+  boolean _resume = false;
   while (_resume == false) {
     if (Serial.available() > 0) {
       char inByte = Serial.read();
@@ -107,7 +78,6 @@ void calibrate() {
         if (!EEPROM.commit()) {
           Serial.println(F("Failed to write to EEPROM!"));
         }
-        // loadCell.setCalibrationFactor(calFactor);
         Serial.println(F("Calibration saved!"));
         _resume = true;
       } else if (inByte == 'n') {
@@ -132,7 +102,7 @@ void setup() {
   Serial.println(F("Connected!"));
 
   Wire.begin();
-  Wire.setClock(4000000);
+  // Wire.setClock(4000000);
 
   // Init communication to sensor
   if (!loadCell.begin(Wire, false)) {
@@ -147,10 +117,10 @@ void setup() {
   }
 
   // Use external clock source
-  // if (!loadCell.setBit(NAU7802_PU_CTRL_OSCS, NAU7802_PU_CTRL)) {
-  //   Serial.println(F("Failed to set CTRL_OSCS"));
-  //   return;
-  // }
+  if (!loadCell.setBit(NAU7802_PU_CTRL_OSCS, NAU7802_PU_CTRL)) {
+    Serial.println(F("Failed to set CTRL_OSCS"));
+    return;
+  }
 
   // Bypass LDO for direct AVDD supply
   // if (!loadCell.clearBit(NAU7802_PU_CTRL_AVDDS, NAU7802_PU_CTRL)) {
@@ -171,7 +141,7 @@ void setup() {
   }
 
   // Set gain
-  if (!loadCell.setGain(NAU7802_GAIN_32)) {
+  if (!loadCell.setGain(NAU7802_GAIN_4)) {
     Serial.println(F("Failed to set gain"));
     return;
   }
@@ -202,20 +172,17 @@ void setup() {
 
   Serial.println(F("Setting zero offset..."));
 
-  // Set up scale parameters
-  loadCell.calculateZeroOffset();
-
+  // Load calibration params from EEPROM
   EEPROM.get(0, settings);
   if (settings.readings[0] != 0) {
-    // loadCell.setCalibrationFactor(calFactor);
     Serial.println(F("Loaded calibration!"));
-    Serial.printf("(%d %.2f) (%d %.2f) (%d %.2f)", settings.readings[0],
-                  settings.factors[0], settings.readings[1],
-                  settings.factors[1], settings.readings[2],
-                  settings.factors[2]);
+    printCalibration();
   } else {
     calibrate();
   }
+
+  // Tare scale
+  loadCell.calculateZeroOffset();
 
   initialized = true;
   Serial.println(F("Initialized!"));
@@ -245,15 +212,30 @@ void loop() {
     float y0 = settings.factors[0];
     float y1 = settings.factors[1];
     float y2 = settings.factors[2];
-    float x = loadCell.getAverage(8);
+    int32_t x = loadCell.getAverage(8);
+
+    // three point lagrangian interpolation
     float calFactor = ((((x - x1) * (x - x2)) / ((x0 - x1) * (x0 - x2))) * y0) +
                       ((((x - x0) * (x - x2)) / ((x1 - x0) * (x1 - x2))) * y1) +
                       ((((x - x0) * (x - x1)) / ((x2 - x0) * (x2 - x1))) * y2);
+    // four point lagrangian interpolation
+    // float calFactor = (y0 * (((x - x1) / (x0 - x1)) * ((x - x2) / (x0 - x2))
+    // *
+    //                          ((x - x3) / (x0 - x3)))) +
+    //                   (y1 * (((x - x0) / (x1 - x0)) * ((x - x2) / (x1 - x2))
+    //                   *
+    //                          ((x - x3) / (x1 - x3)))) +
+    //                   (y2 * (((x - x0) / (x2 - x0)) * ((x - x1) / (x2 - x1))
+    //                   *
+    //                          ((x - x3) / (x2 - x3)))) +
+    //                   (y3 * (((x - x0) / (x3 - x0)) * ((x - x1) / (x3 - x1))
+    //                   *
+    //                          ((x - x2) / (x3 - x2))));
 
-    Serial.printf("Cal factor %.2f\n", calFactor);
     float mass = (x - loadCell.getZeroOffset()) / calFactor;
 
-    Serial.printf("Raw value %d\n", x);
+    Serial.printf("Cal factor %.2f\n", calFactor);
+    Serial.printf("Raw value %d\n", loadCell.getReading());
     Serial.printf("Scaled value %.2f\n", mass);
   }
 }
