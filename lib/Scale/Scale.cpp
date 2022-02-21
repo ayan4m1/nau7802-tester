@@ -15,10 +15,9 @@ void waitForCharacter(char c) {
 }
 
 void Scale::printCalibration() {
-  Serial.printf("(%d %.2f)\n(%d %.2f)\n(%d %.2f)\n\n", settings->readings[0],
-                settings->factors[0], settings->readings[1],
-                settings->factors[1], settings->readings[2],
-                settings->factors[2]);
+  Serial.printf("(%d %.2f)\n(%d %.2f)\n(%d %.2f)\n\n", settings.readings[0],
+                settings.factors[0], settings.readings[1], settings.factors[1],
+                settings.readings[2], settings.factors[2]);
 }
 
 void Scale::calibrateSlot(uint8_t slot, float weight, uint8_t samples = 4) {
@@ -31,18 +30,15 @@ void Scale::calibrateSlot(uint8_t slot, float weight, uint8_t samples = 4) {
   }
   reading /= (float)samples;
   factor /= (float)samples;
-  settings->readings[slot] = reading;
-  settings->factors[slot] = factor;
+  settings.readings[slot] = reading;
+  settings.factors[slot] = factor;
 
   Serial.printf("Reading %fg: %d\n", weight, reading);
   Serial.printf("Factor %fg: %.4f\n", weight, factor);
 }
 
-Scale::Scale(Settings *settings) { this->settings = settings; }
-
 bool Scale::init() {
   Wire.begin();
-  // Wire.setClock(4000000);
 
   // Init communication to sensor
   if (!loadCell.begin(Wire, false)) {
@@ -81,7 +77,7 @@ bool Scale::init() {
   }
 
   // Set gain
-  if (!loadCell.setGain(NAU7802_GAIN_32)) {
+  if (!loadCell.setGain(NAU7802_GAIN_4)) {
     Serial.println(F("Failed to set gain"));
     return false;
   }
@@ -118,6 +114,11 @@ bool Scale::init() {
   } else {
     return false;
   }
+}
+
+void Scale::calibrate(const Settings settings) {
+  this->settings = settings;
+  printCalibration();
 }
 
 void Scale::calibrate() {
@@ -185,12 +186,12 @@ float Scale::getMass() {
     return 0;
   }
 
-  float x0 = settings->readings[0];
-  float x1 = settings->readings[1];
-  float x2 = settings->readings[2];
-  float y0 = settings->factors[0];
-  float y1 = settings->factors[1];
-  float y2 = settings->factors[2];
+  float x0 = settings.readings[0];
+  float x1 = settings.readings[1];
+  float x2 = settings.readings[2];
+  float y0 = settings.factors[0];
+  float y1 = settings.factors[1];
+  float y2 = settings.factors[2];
   int32_t x = loadCell.getAverage(8);
 
   // three point lagrangian interpolation
@@ -213,8 +214,8 @@ float Scale::getMass() {
 
   float mass = (x - loadCell.getZeroOffset()) / calFactor;
 
-  Serial.printf("Divider %.2f\n", calFactor);
-  Serial.printf("Raw %d\n", loadCell.getReading());
+  // Serial.printf("Divider %.2f\n", calFactor);
+  // Serial.printf("Raw %d\n", loadCell.getReading());
 
   return mass;
 }

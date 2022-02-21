@@ -7,16 +7,16 @@
 #define SCALE_H
 
 class Scale {
-  Settings *settings;
+  Settings settings;
   static NAU7802 loadCell;
   bool initialized = false;
   void printCalibration();
   void calibrateSlot(uint8_t slot, float weight, uint8_t samples);
 
  public:
-  Scale(Settings *settings);
   bool init();
   void calibrate();
+  void calibrate(const Settings settings);
   void tare();
   bool poll();
   float getMass();
