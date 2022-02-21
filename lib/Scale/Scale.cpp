@@ -64,8 +64,8 @@ bool Scale::init() {
   //   return false;
   // }
 
-  // Set LDO to highest possible voltage
-  if (!loadCell.setLDO(NAU7802_LDO_4V5)) {
+  // Set LDO to lowest possible voltage
+  if (!loadCell.setLDO(NAU7802_LDO_2V4)) {
     Serial.println(F("Failed to set LDO"));
     return false;
   }
@@ -76,8 +76,8 @@ bool Scale::init() {
     return false;
   }
 
-  // Set gain
-  if (!loadCell.setGain(NAU7802_GAIN_4)) {
+  // Set highest possible gain
+  if (!loadCell.setGain(NAU7802_GAIN_128)) {
     Serial.println(F("Failed to set gain"));
     return false;
   }
@@ -117,6 +117,10 @@ bool Scale::init() {
 }
 
 void Scale::calibrate(const Settings settings) {
+  if (!initialized) {
+    return;
+  }
+
   this->settings = settings;
   printCalibration();
 }
@@ -129,7 +133,7 @@ void Scale::calibrate() {
   Serial.println(F("Send 't' to tare and continue."));
 
   waitForCharacter('t');
-  loadCell.calculateZeroOffset();
+  tare();
 
   Serial.println(F("Place a nickel on load cell and send 'c'."));
 
@@ -176,7 +180,7 @@ void Scale::tare() {
   }
 
   Serial.println(F("Taring..."));
-  loadCell.calculateZeroOffset();
+  loadCell.calculateZeroOffset(4);
 }
 
 bool Scale::poll() { return initialized && loadCell.available(); }
@@ -216,6 +220,7 @@ float Scale::getMass() {
 
   // Serial.printf("Divider %.2f\n", calFactor);
   // Serial.printf("Raw %d\n", loadCell.getReading());
+  // Serial.printf("Zero %d\n", loadCell.getZeroOffset());
 
   return mass;
 }

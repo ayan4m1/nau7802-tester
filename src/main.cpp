@@ -38,6 +38,7 @@ void setup() {
   }
 
   Serial.println(F("Initialized!"));
+  scale.tare();
 }
 
 void loop() {
