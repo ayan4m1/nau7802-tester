@@ -6,6 +6,20 @@
 #ifndef SCALE_H
 #define SCALE_H
 
+enum ScaleInit {
+  OK = 0,
+  CONNECT_FAIL = -1,
+  RESET_FAIL = -2,
+  EXTERNAL_CLOCK_FAIL = -3,
+  LDO_FAIL = -4,
+  POWER_UP_FAIL = -5,
+  GAIN_FAIL = -6,
+  SAMPLE_RATE_FAIL = -7,
+  CLK_CHP_FAIL = -8,
+  CHAN2_CAP_FAIL = -9,
+  CALIBRATION_FAIL = -10
+};
+
 class Scale {
   Settings settings;
   static NAU7802 loadCell;
@@ -14,7 +28,7 @@ class Scale {
   void calibrateSlot(uint8_t slot, float weight, uint8_t samples);
 
  public:
-  bool init();
+  ScaleInit init(bool ldo, bool oscs);
   void calibrate();
   void calibrate(const Settings settings);
   void tare();

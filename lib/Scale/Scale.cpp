@@ -15,9 +15,9 @@ void waitForCharacter(char c) {
 }
 
 void Scale::printCalibration() {
-  Serial.printf("(%d %.2f)\n(%d %.2f)\n(%d %.2f)\n\n", settings.readings[0],
-                settings.factors[0], settings.readings[1], settings.factors[1],
-                settings.readings[2], settings.factors[2]);
+  Serial.printf("(5 %d %.2f)\n(10 %d %.2f)\n(200 %d %.2f)\n\n",
+                settings.readings[0], settings.factors[0], settings.readings[1],
+                settings.factors[1], settings.readings[2], settings.factors[2]);
 }
 
 void Scale::calibrateSlot(uint8_t slot, float weight, uint8_t samples = 4) {
@@ -37,83 +37,79 @@ void Scale::calibrateSlot(uint8_t slot, float weight, uint8_t samples = 4) {
   Serial.printf("Factor %fg: %.4f\n", weight, factor);
 }
 
-bool Scale::init() {
+ScaleInit Scale::init(bool ldo, bool oscs) {
   Wire.begin();
 
   // Init communication to sensor
   if (!loadCell.begin(Wire, false)) {
     Serial.println(F("Failed to connect to NAU7802"));
-    return false;
+    return ScaleInit::CONNECT_FAIL;
   }
 
   // Reset all registers
   if (!loadCell.reset()) {
     Serial.println(F("Failed to reset"));
-    return false;
+    return ScaleInit::RESET_FAIL;
   }
 
   // Use external clock source
-  if (!loadCell.setBit(NAU7802_PU_CTRL_OSCS, NAU7802_PU_CTRL)) {
+  if (oscs && !loadCell.setBit(NAU7802_PU_CTRL_OSCS, NAU7802_PU_CTRL)) {
     Serial.println(F("Failed to set CTRL_OSCS"));
-    return false;
+    return ScaleInit::EXTERNAL_CLOCK_FAIL;
   }
 
-  // Bypass LDO for direct AVDD supply
-  // if (!loadCell.clearBit(NAU7802_PU_CTRL_AVDDS, NAU7802_PU_CTRL)) {
-  //   Serial.println(F("Failed to bypass LDO"));
-  //   return false;
-  // }
-
-  // Set LDO to lowest possible voltage
-  if (!loadCell.setLDO(NAU7802_LDO_2V4)) {
-    Serial.println(F("Failed to set LDO"));
-    return false;
+  if (!ldo) {
+    // Bypass LDO for direct AVDD supply
+    if (!loadCell.clearBit(NAU7802_PU_CTRL_AVDDS, NAU7802_PU_CTRL)) {
+      Serial.println(F("Failed to bypass LDO"));
+      return ScaleInit::LDO_FAIL;
+    }
+  } else {
+    // Set LDO to lowest possible voltage
+    if (!loadCell.setLDO(NAU7802_LDO_2V4)) {
+      Serial.println(F("Failed to set LDO"));
+      return ScaleInit::LDO_FAIL;
+    }
   }
 
   // Power up sensor
   if (!loadCell.powerUp()) {
     Serial.println(F("Failed to power up"));
-    return false;
+    return ScaleInit::POWER_UP_FAIL;
   }
 
   // Set highest possible gain
   if (!loadCell.setGain(NAU7802_GAIN_128)) {
     Serial.println(F("Failed to set gain"));
-    return false;
+    return ScaleInit::GAIN_FAIL;
   }
 
   // Set sample rate
   if (!loadCell.setSampleRate(NAU7802_SPS_10)) {
     Serial.println(F("Failed to set sample rate"));
-    return false;
+    return ScaleInit::SAMPLE_RATE_FAIL;
   }
 
   // Disable clock chopper
   if (!loadCell.setRegister(NAU7802_ADC, 0x30)) {
     Serial.println(F("Failed to disable CLK_CHP"));
-    return false;
+    return ScaleInit::CLK_CHP_FAIL;
   }
 
   // Enable 330pF decoupling cap on chan 2.
   if (!loadCell.setBit(NAU7802_PGA_PWR_PGA_CAP_EN, NAU7802_PGA_PWR)) {
     Serial.println(F("Failed to set up PWR_PGA_CAP_EN"));
-    return false;
+    return ScaleInit::CHAN2_CAP_FAIL;
   }
 
   // Calibrate analog front end
-  uint8_t retries = 10;
-  while (retries > 0 && !loadCell.calibrateAFE()) {
-    Serial.println(F("Failed to calibrate system, retrying..."));
-    delay(100);
-    retries--;
+  if (!loadCell.calibrateAFE()) {
+    Serial.println(F("Failed to calibrate system"));
+    return ScaleInit::CALIBRATION_FAIL;
   }
 
-  if (retries > 0) {
-    initialized = true;
-    return true;
-  } else {
-    return false;
-  }
+  initialized = true;
+  return ScaleInit::OK;
 }
 
 void Scale::calibrate(const Settings settings) {
@@ -218,9 +214,9 @@ float Scale::getMass() {
 
   float mass = (x - loadCell.getZeroOffset()) / calFactor;
 
-  // Serial.printf("Divider %.2f\n", calFactor);
-  // Serial.printf("Raw %d\n", loadCell.getReading());
-  // Serial.printf("Zero %d\n", loadCell.getZeroOffset());
+  Serial.printf("Divider %.2f\n", calFactor);
+  Serial.printf("Raw %d\n", loadCell.getReading());
+  Serial.printf("Zero %d\n", loadCell.getZeroOffset());
 
   return mass;
 }

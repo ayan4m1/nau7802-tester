@@ -7,22 +7,29 @@
 Settings settings = Settings();
 Scale scale = Scale();
 Display display = Display();
-float lastMass = 0;
+DisplayState state = DisplayState();
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial) {
-    delay(100);
-  }
-  Serial.println(F("Initializing scale..."));
 
-  if (!scale.init()) {
+  Serial.println(F("Initializing display..."));
+  if (!display.init()) {
     delay(5000);
     return;
   }
 
-  Serial.println(F("Initializing settings..."));
+  state.loading = true;
+  display.update(state);
 
+  Serial.println(F("Initializing scale..."));
+  auto scaleInit = scale.init(true, true);
+  if (scaleInit != ScaleInit::OK) {
+    state.error = scaleInit;
+    display.update(state);
+    return;
+  }
+
+  Serial.println(F("Initializing settings..."));
   if (SettingsManager::init(&settings)) {
     Serial.println(F("Loaded calibration!"));
     scale.calibrate(settings);
@@ -31,14 +38,9 @@ void setup() {
     scale.calibrate();
   }
 
-  Serial.println(F("Initializing display..."));
-  if (!display.init()) {
-    delay(5000);
-    return;
-  }
-
-  Serial.println(F("Initialized!"));
   scale.tare();
+  state.loading = false;
+  display.update(state);
 }
 
 void loop() {
@@ -50,12 +52,9 @@ void loop() {
       scale.tare();
     }
   } else if (scale.poll()) {
-    DisplayState state = DisplayState();
-
-    state.mass = scale.getMass();
-    state.stable =
-        (max(state.mass, lastMass) - min(state.mass, lastMass)) < 0.02;
-    lastMass = state.mass;
+    float newMass = scale.getMass();
+    state.stable = (max(state.mass, newMass) - min(state.mass, newMass)) < 0.02;
+    state.mass = newMass;
     display.update(state);
     Serial.printf("Mass: %.2f\n", state.mass);
   }

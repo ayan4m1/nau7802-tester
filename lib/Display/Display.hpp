@@ -2,7 +2,11 @@
 #include <Arduino.h>
 #include <SoftwareWire.h>
 
+#include <Scale.hpp>
+
 struct DisplayState {
+  bool loading;
+  ScaleInit error;
   float mass;
   bool stable;
 };
