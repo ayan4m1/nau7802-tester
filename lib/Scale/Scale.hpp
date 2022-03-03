@@ -7,7 +7,7 @@
 #define SCALE_H
 
 enum ScaleInit {
-  OK = 0,
+  SUCCESS = 0,
   CONNECT_FAIL = -1,
   RESET_FAIL = -2,
   EXTERNAL_CLOCK_FAIL = -3,

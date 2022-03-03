@@ -109,7 +109,7 @@ ScaleInit Scale::init(bool ldo, bool oscs) {
   }
 
   initialized = true;
-  return ScaleInit::OK;
+  return ScaleInit::SUCCESS;
 }
 
 void Scale::calibrate(const Settings settings) {

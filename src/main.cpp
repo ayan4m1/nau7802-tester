@@ -23,7 +23,7 @@ void setup() {
 
   Serial.println(F("Initializing scale..."));
   auto scaleInit = scale.init(true, true);
-  if (scaleInit != ScaleInit::OK) {
+  if (scaleInit != ScaleInit::SUCCESS) {
     state.error = scaleInit;
     display.update(state);
     return;
