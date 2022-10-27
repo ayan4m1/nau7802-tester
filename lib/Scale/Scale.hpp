@@ -1,10 +1,10 @@
+#ifndef SCALE_H
+#define SCALE_H
+
 #include <Arduino.h>
 #include <SparkFun_Qwiic_Scale_NAU7802_Arduino_Library.h>
 
 #include <Settings.hpp>
-
-#ifndef SCALE_H
-#define SCALE_H
 
 enum ScaleInit {
   SUCCESS = 0,

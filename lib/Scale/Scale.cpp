@@ -154,8 +154,7 @@ void Scale::calibrate() {
     if (Serial.available() > 0) {
       char inByte = Serial.read();
       if (inByte == 'y') {
-        EEPROM.put(0, settings);
-        if (!EEPROM.commit()) {
+        if (!SettingsManager::commit(settings)) {
           Serial.println(F("Failed to write to EEPROM!"));
         }
         Serial.println(F("Calibration saved!"));
