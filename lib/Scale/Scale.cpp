@@ -176,7 +176,7 @@ void Scale::tare() {
   }
 
   Serial.println(F("Taring..."));
-  loadCell.calculateZeroOffset(4);
+  loadCell.calculateZeroOffset();
 }
 
 bool Scale::poll() { return initialized && loadCell.available(); }
@@ -192,7 +192,7 @@ float Scale::getMass() {
   float y0 = settings.factors[0];
   float y1 = settings.factors[1];
   float y2 = settings.factors[2];
-  int32_t x = loadCell.getAverage(8);
+  int32_t x = loadCell.getAverage(2);
 
   // three point lagrangian interpolation
   float calFactor = ((((x - x1) * (x - x2)) / ((x0 - x1) * (x0 - x2))) * y0) +
